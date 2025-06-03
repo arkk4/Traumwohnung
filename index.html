@@ -1,0 +1,903 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meine Traumwohnung</title>
+    <!-- Подключение Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Использование шрифта Inter */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6; /* Светло-серый фон */
+            color: #374151; /* Темный текст */
+        }
+        /* Стиль для основного контейнера, чтобы вместить плавающее меню */
+        .main-layout {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 1rem;
+            max-width: 1200px; /* Ограничение ширины для больших экранов */
+            margin: 0 auto;
+            position: relative; /* Для позиционирования плавающего меню */
+        }
+        @media (min-width: 1024px) { /* Для больших экранов */
+            .main-layout {
+                flex-direction: row;
+                align-items: flex-start;
+                justify-content: center;
+                gap: 2rem;
+            }
+        }
+
+        /* Стиль для контейнера комнаты */
+        .room {
+            background-color: #ffffff; /* Белый фон для комнат */
+            border: 1px solid #d1d5db; /* Светло-серый бордюр */
+            border-radius: 0.5rem; /* Закругленные углы */
+            display: flex; /* Используем flexbox для выравнивания содержимого */
+            flex-direction: column; /* Содержимое располагается вертикально */
+            align-items: center; /* Центрирование по горизонтали */
+            justify-content: center; /* Центрирование по вертикали */
+            font-weight: bold;
+            font-size: 1rem; /* Уменьшенный шрифт для номеров */
+            color: #1f2937; /* Темный цвет для номеров */
+            padding: 0.5rem; /* Уменьшенный отступ */
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); /* Легкая тень */
+            width: 100%; /* Заполняет ячейку сетки */
+            height: 100%; /* Заполняет ячейку сетки */
+            text-align: center;
+            position: relative; /* Для позиционирования дверей внутри */
+            overflow: hidden; /* Чтобы двери не выходили за пределы комнаты */
+            cursor: grab; /* Курсор для перетаскивания */
+            touch-action: none; /* Предотвращает прокрутку на сенсорных устройствах */
+            box-sizing: border-box; /* Включаем padding и border в общий размер */
+        }
+        .room.dragging {
+            cursor: grabbing;
+            z-index: 20; /* Чтобы перетаскиваемая комната была сверху */
+            opacity: 0.8;
+            position: absolute; /* Для свободного перетаскивания */
+            /* Размеры устанавливаются динамически в JS */
+        }
+        .room .text-xl {
+            font-size: 1.125rem; /* Уменьшенный размер для номера */
+        }
+        .room .text-sm {
+            font-size: 0.75rem; /* Уменьшенный размер для содержимого */
+        }
+
+        /* Стиль для коридора */
+        .corridor-room {
+            background-color: #e0f2f7; /* Светло-голубой фон для коридора */
+            border-color: #90caf9; /* Голубой бордюр */
+        }
+        /* Стиль для индикатора дверей */
+        .door-indicator {
+            background-color: #b0b0b0; /* Серый цвет для дверей */
+            border-radius: 2px;
+            position: absolute;
+            z-index: 10; /* Чтобы двери были над содержимым комнаты */
+        }
+        .door-top {
+            width: 30px; /* Уменьшенный размер дверей */
+            height: 4px;
+            top: -2px; /* Немного перекрывает бордюр */
+            left: 50%;
+            transform: translateX(-50%);
+        }
+        .door-right {
+            width: 4px;
+            height: 30px;
+            right: -2px;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+        .door-bottom {
+            width: 30px;
+            height: 4px;
+            bottom: -2px;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+        .door-left {
+            width: 4px;
+            height: 30px;
+            left: -2px;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+
+        /* Стиль для плавающего меню (палитры) */
+        #roomPalette {
+            position: fixed;
+            top: 1rem;
+            right: 1rem;
+            background-color: #ffffff;
+            border: 1px solid #d1d5db;
+            border-radius: 0.75rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            padding: 1rem;
+            z-index: 100;
+            width: 180px; /* Фиксированная ширина */
+            max-height: 90vh;
+            overflow-y: auto;
+            transition: transform 0.3s ease-in-out;
+        }
+        @media (max-width: 1023px) { /* Для мобильных устройств */
+            #roomPalette {
+                position: static; /* Статическое позиционирование на мобильных */
+                width: 100%;
+                margin-bottom: 1rem;
+            }
+            .main-layout {
+                flex-direction: column-reverse; /* Палитра сверху на мобильных */
+            }
+        }
+
+        .palette-item {
+            display: flex;
+            align-items: center;
+            justify-content: center; /* Центрируем эмодзи */
+            padding: 0.5rem 0.75rem;
+            margin-bottom: 0.5rem;
+            background-color: #f3f4f6;
+            border-radius: 0.375rem;
+            cursor: grab; /* Курсор для перетаскивания */
+            transition: background-color 0.2s ease-in-out;
+            font-size: 1.5rem; /* Увеличенный размер эмодзи */
+            font-weight: 500;
+            height: 60px; /* Фиксированная высота для эмодзи */
+        }
+        .palette-item:hover {
+            background-color: #e5e7eb;
+        }
+        .palette-item.in-use {
+            background-color: #d1fae5; /* Зеленый для используемых комнат */
+            color: #065f46;
+            border: 1px solid #34d399;
+            cursor: default; /* Нет перетаскивания, если уже на холсте */
+        }
+        /* Стиль для легенды (викторины) */
+        .legend-item {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            margin-bottom: 0.75rem;
+            padding: 0.5rem;
+            border: 1px solid #e5e7eb;
+            border-radius: 0.375rem;
+            background-color: #f9fafb;
+        }
+        .legend-text-row {
+            display: flex;
+            align-items: center;
+            width: 100%;
+            flex-wrap: wrap; /* Позволяет элементам переноситься на новую строку */
+        }
+        .quiz-input {
+            flex-grow: 1; /* Занимает доступное пространство */
+            padding: 0.25rem 0.5rem;
+            border: 1px solid #d1d5db;
+            border-radius: 0.25rem;
+            margin-right: 0.5rem;
+            min-width: 80px; /* Минимальная ширина для ввода */
+        }
+        .check-btn, .reveal-btn {
+            background-color: #6366f1;
+            color: white;
+            padding: 0.3rem 0.75rem;
+            border-radius: 0.375rem;
+            font-size: 0.875rem;
+            cursor: pointer;
+            transition: background-color 0.2s ease-in-out;
+            margin-left: 0.5rem;
+            white-space: nowrap; /* Предотвращает перенос текста кнопки */
+        }
+        .check-btn:hover, .reveal-btn:hover {
+            background-color: #4f46e5;
+        }
+        .feedback-message {
+            margin-top: 0.5rem;
+            font-size: 0.875rem;
+            font-weight: bold;
+            width: 100%; /* Занимает всю ширину */
+        }
+        .feedback-correct {
+            color: #10b981; /* Зеленый */
+        }
+        .feedback-incorrect {
+            color: #ef4444; /* Красный */
+        }
+        .correct-answer-display {
+            color: #10b981;
+            font-weight: normal;
+            margin-left: 0.5rem;
+            display: none; /* По умолчанию скрыто */
+        }
+
+        /* Стиль для подсветки в легенде */
+        .legend-item.correct {
+            background-color: #d1fae5; /* Светло-зеленый */
+            border-color: #34d399;
+        }
+        .legend-item.incorrect {
+            background-color: #fee2e2; /* Светло-красный */
+            border-color: #ef4444;
+        }
+
+        /* Стиль для цветных точек */
+        .color-dot {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 8px;
+            flex-shrink: 0; /* Предотвращает сжатие точки */
+        }
+        .dot-pink { background-color: #ec4899; } /* Tailwind pink-500 */
+        .dot-blue { background-color: #3b82f6; } /* Tailwind blue-500 */
+        .dot-green { background-color: #22c55e; } /* Tailwind green-500 */
+
+
+        /* Стиль для контейнера плана этажа */
+        #floorPlanDisplay {
+            display: grid;
+            grid-template-columns: repeat(5, 100px); /* Сетка 5x5 с ячейками по 100px */
+            grid-template-rows: repeat(5, 100px);
+            gap: 0px; /* Без промежутков между ячейками */
+            position: relative;
+            width: 500px; /* 5 * 100px */
+            height: 500px; /* 5 * 100px */
+            border: 2px dashed #a0aec0; /* Бордюр для зоны перетаскивания */
+            background-color: #e2e8f0; /* Светло-серый фон */
+            overflow: hidden; /* Предотвращает выход комнат за пределы контейнера */
+        }
+        /* Стиль для пустых ячеек сетки */
+        .grid-cell {
+            border: 1px solid rgba(0,0,0,0.05); /* Легкий бордюр для визуализации сетки */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+            color: #9ca3af;
+        }
+        .grid-cell.highlight {
+            background-color: rgba(99, 102, 241, 0.2); /* Светло-фиолетовый для подсветки */
+            border: 2px solid #6366f1;
+        }
+    </style>
+</head>
+<body class="p-4 sm:p-8">
+    <div class="main-layout">
+        <div class="flex-1 max-w-2xl w-full bg-white p-6 sm:p-8 rounded-xl shadow-lg">
+            <h1 class="text-3xl sm:text-4xl font-extrabold text-center mb-6 text-indigo-700">Meine Traumwohnung</h1>
+
+            <!-- Секция для управления планом -->
+            <div class="mb-8 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                <p class="text-lg font-medium text-gray-700 mb-2">
+                    Ziehen Sie Zimmer aus der Palette auf den Grundriss, um Ihren Plan zu erstellen!
+                </p>
+                <button id="clearPlanBtn"
+                        class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105">
+                    Plan löschen
+                </button>
+            </div>
+
+            <!-- Секция для отображения плана этажа -->
+            <div id="floorPlanContainer" class="mb-8 p-4 bg-gray-50 rounded-lg border border-gray-200 min-h-[200px] flex items-center justify-center">
+                <div id="floorPlanDisplay">
+                    <!-- Здесь будут сгенерированы комнаты -->
+                </div>
+            </div>
+
+            <!-- Секция для легенды (викторины) -->
+            <div id="legendContainer" class="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                <h2 class="text-2xl font-semibold text-gray-800 mb-4">Ordnen Sie</h2>
+                <p class="text-gray-600 mb-4">Geben Sie die Zimmernummer ein, die dem deutschen Namen entspricht.</p>
+                <div class="flex items-center justify-between mb-4" id="checkAllContainer">
+                    <button id="checkAllBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105">
+                        Antworten anzeigen
+                    </button>
+                    <span id="scoreDisplay" class="text-lg font-semibold text-gray-800">Richtige Antworten: 0/0</span>
+                </div>
+                <div id="legendDisplay" class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
+                    <!-- Здесь будет сгенерирована легенда -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Плавающее меню (палитра) -->
+        <div id="roomPalette">
+            <h3 class="text-xl font-semibold text-gray-800 mb-4">Verfügbare Zimmer:</h3>
+            <div id="paletteItemsContainer">
+                <!-- Элементы палитры будут сгенерированы здесь -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Получение ссылок на элементы DOM
+        const clearPlanBtn = document.getElementById('clearPlanBtn');
+        const floorPlanDisplay = document.getElementById('floorPlanDisplay');
+        const legendDisplay = document.getElementById('legendDisplay');
+        const checkAllBtn = document.getElementById('checkAllBtn');
+        const scoreDisplay = document.getElementById('scoreDisplay');
+        const paletteItemsContainer = document.getElementById('paletteItemsContainer');
+
+        // Глобальная переменная для хранения данных о текущих комнатах на холсте
+        let currentRoomsOnCanvas = [];
+        const GRID_CELL_SIZE = 100; // Размер ячейки сетки в пикселях
+        const GRID_ROWS = 5;
+        const GRID_COLS = 5;
+
+        // Карта для хранения статических данных о комнатах
+        const allRoomsMap = new Map([
+            // Добавлены gridWidth и gridHeight для каждой комнаты
+            // Добавлен 'article' для каждой комнаты
+            ['Flur', { ukrainian: 'Коридор', content: '🧥👟', gridWidth: 2, gridHeight: 1, article: 'Der' }],
+            ['Wohnzimmer', { ukrainian: 'Вітальня', content: '🛋️📺', gridWidth: 1, gridHeight: 1, article: 'Das' }],
+            ['Küche', { ukrainian: 'Кухня', content: '🍽️🍳🧊', gridWidth: 1, gridHeight: 1, article: 'Die' }],
+            ['Bad', { ukrainian: 'Ванна кімната', content: '🛁🚿', gridWidth: 1, gridHeight: 1, article: 'Das' }], // Изменено на 'Bad' и новые эмодзи
+            ['Toilette', { ukrainian: 'Туалет', content: '🚽🧻', gridWidth: 1, gridHeight: 1, article: 'Die' }], // Новая комната
+            ['Schlafzimmer', { ukrainian: 'Спальня', content: '🛏️🚪', gridWidth: 1, gridHeight: 1, article: 'Das' }],
+            ['Kinderzimmer', { ukrainian: 'Дитяча кімната', content: '🧸📚', gridWidth: 1, gridHeight: 1, article: 'Das' }],
+            ['Arbeitszimmer', { ukrainian: 'Кабінет', content: '🖥️🪑', gridWidth: 1, gridHeight: 1, article: 'Das' }],
+            ['Balkon', { ukrainian: 'Балкон', content: '🌿🪑', gridWidth: 1, gridHeight: 1, article: 'Der' }],
+        ]);
+
+        // Функция для получения класса цвета точки по артиклю
+        function getDotColorClass(article) {
+            switch (article) {
+                case 'Die': return 'dot-pink';
+                case 'Der': return 'dot-blue';
+                case 'Das': return 'dot-green';
+                default: return '';
+            }
+        }
+
+        // Функция для проверки, занята ли область ячеек
+        function isAreaOccupied(startRow, startCol, width, height, excludeRoomId = null) {
+            for (let r = startRow; r < startRow + height; r++) {
+                for (let c = startCol; c < startCol + width; c++) {
+                    // Проверяем, находится ли ячейка за пределами сетки
+                    if (r < 1 || r > GRID_ROWS || c < 1 || c > GRID_COLS) {
+                        return true; // Область выходит за пределы сетки
+                    }
+                    const roomInCell = currentRoomsOnCanvas.find(room =>
+                        room.id !== excludeRoomId && // Исключаем комнату, которую перетаскиваем
+                        r >= room.gridRow && r < (room.gridRow + room.gridHeight) &&
+                        c >= room.gridColumn && c < (room.gridColumn + room.gridWidth)
+                    );
+                    if (roomInCell) {
+                        return true; // Ячейка занята
+                    }
+                }
+            }
+            return false; // Область свободна
+        }
+
+        // Функция для подсветки целевых ячеек
+        let highlightedCells = [];
+        function highlightTargetCells(startRow, startCol, width, height) {
+            removeHighlight(); // Убираем предыдущую подсветку
+
+            for (let r = startRow; r < startRow + height; r++) {
+                for (let c = startCol; c < startCol + width; c++) {
+                    const targetCell = floorPlanDisplay.querySelector(`.grid-cell[style*="grid-row: ${r}"][style*="grid-column: ${c}"]`);
+                    if (targetCell) {
+                        targetCell.classList.add('highlight');
+                        highlightedCells.push(targetCell);
+                    }
+                }
+            }
+        }
+
+        // Функция для удаления подсветки
+        function removeHighlight() {
+            highlightedCells.forEach(cell => cell.classList.remove('highlight'));
+            highlightedCells = [];
+        }
+
+        // Функция для рендеринга легенды (викторины)
+        function renderLegendQuiz() {
+            legendDisplay.innerHTML = '';
+            scoreDisplay.textContent = `Richtige Antworten: 0/${currentRoomsOnCanvas.length}`;
+
+            // Собираем уникальные типы комнат, которые есть на холсте
+            const uniqueRoomTypesOnCanvas = new Set(currentRoomsOnCanvas.map(room => room.german));
+
+            // Создаем объект для хранения всех номеров для каждого типа комнаты
+            const roomTypeNumbers = {};
+            currentRoomsOnCanvas.forEach(room => {
+                if (!roomTypeNumbers[room.german]) {
+                    roomTypeNumbers[room.german] = [];
+                }
+                roomTypeNumbers[room.german].push(room.number);
+            });
+
+            // Преобразуем Set в массив для сортировки
+            const sortedUniqueRoomTypes = Array.from(uniqueRoomTypesOnCanvas).sort();
+
+            sortedUniqueRoomTypes.forEach(roomType => {
+                const roomData = allRoomsMap.get(roomType); // Получаем данные о типе комнаты
+                if (!roomData) return;
+
+                const correctNumbers = roomTypeNumbers[roomType].join(','); // Сохраняем все номера через запятую
+                const dotColorClass = getDotColorClass(roomData.article); // Получаем класс цвета точки
+
+                const legendItemDiv = document.createElement('div');
+                legendItemDiv.className = 'legend-item';
+                legendItemDiv.innerHTML = `
+                    <div class="legend-text-row">
+                        <span class="color-dot ${dotColorClass}"></span>
+                        <span class="text-gray-900 font-medium">${roomData.article} ${roomType}</span>
+                        <input type="number" class="quiz-input" placeholder="Nummer" data-correct-numbers="${correctNumbers}" min="1" max="${currentRoomsOnCanvas.length}">
+                        <!-- Кнопка "Показать" удалена -->
+                    </div>
+                    <div class="feedback-message"></div>
+                    <span class="correct-answer-display" style="display:none;">Richtige Nummern: ${correctNumbers}</span>
+                `;
+                legendDisplay.appendChild(legendItemDiv);
+            });
+
+            attachQuizEventListeners();
+        }
+
+        // Функция для прикрепления обработчиков событий к викторине
+        function attachQuizEventListeners() {
+            document.querySelectorAll('.quiz-input').forEach(input => {
+                input.oninput = (event) => {
+                    const inputField = event.target;
+                    const item = inputField.closest('.legend-item');
+                    const feedbackMessage = item.querySelector('.feedback-message');
+                    const correctNumbersStr = inputField.dataset.correctNumbers;
+                    const correctNumbers = correctNumbersStr.split(',').map(Number);
+                    const enteredNumber = parseInt(inputField.value);
+
+                    item.classList.remove('correct', 'incorrect'); // Убираем предыдущие классы
+                    feedbackMessage.textContent = '';
+                    feedbackMessage.classList.remove('feedback-correct', 'feedback-incorrect');
+
+                    if (inputField.value.trim() === '') {
+                        return;
+                    }
+
+                    if (isNaN(enteredNumber)) {
+                        // Неправильный формат, но не помечаем как incorrect до проверки
+                    } else if (correctNumbers.includes(enteredNumber)) {
+                        item.classList.add('correct');
+                    } else {
+                        item.classList.add('incorrect');
+                    }
+                };
+            });
+        }
+
+        // Функция для рендеринга палитры комнат
+        function renderPalette() {
+            paletteItemsContainer.innerHTML = '';
+
+            Array.from(allRoomsMap.keys()).forEach(roomType => {
+                const roomData = allRoomsMap.get(roomType);
+                if (!roomData) return;
+
+                const paletteItemDiv = document.createElement('div');
+                paletteItemDiv.className = `palette-item`;
+                paletteItemDiv.draggable = true; // Делаем элемент палитры перетаскиваемым
+                paletteItemDiv.dataset.roomType = roomType; // Сохраняем тип комнаты
+
+                paletteItemDiv.innerHTML = `
+                    <span>${roomData.content}</span>
+                `;
+                paletteItemsContainer.appendChild(paletteItemDiv);
+
+                // Добавляем обработчик начала перетаскивания для элементов палитры
+                paletteItemDiv.addEventListener('dragstart', (event) => {
+                    event.dataTransfer.setData('text/plain', roomType);
+                    // Добавляем временный класс для визуального эффекта во время перетаскивания
+                    event.target.classList.add('dragging-palette-item');
+                });
+
+                paletteItemDiv.addEventListener('dragend', (event) => {
+                    event.target.classList.remove('dragging-palette-item');
+                });
+            });
+        }
+
+        // Функция для рендеринга комнат на холсте
+        function renderCanvas() {
+            floorPlanDisplay.innerHTML = ''; // Очищаем предыдущие комнаты
+
+            // Создаем пустые ячейки сетки для визуализации
+            for (let r = 1; r <= GRID_ROWS; r++) {
+                for (let c = 1; c <= GRID_COLS; c++) {
+                    const cellDiv = document.createElement('div');
+                    cellDiv.className = 'grid-cell';
+                    cellDiv.style.gridRow = r;
+                    cellDiv.style.gridColumn = c;
+                    floorPlanDisplay.appendChild(cellDiv);
+                }
+            }
+
+            // Присваиваем номера комнатам на основе их расположения в сетке
+            const sortedRooms = [...currentRoomsOnCanvas].sort((a, b) => {
+                if (a.gridRow !== b.gridRow) {
+                    return a.gridRow - b.gridRow;
+                }
+                return a.gridColumn - b.gridColumn;
+            });
+
+            let roomNumber = 1;
+            sortedRooms.forEach(room => {
+                room.number = roomNumber++; // Обновляем номер комнаты
+            });
+
+            currentRoomsOnCanvas = sortedRooms; // Обновляем основной массив отсортированными комнатами
+
+            currentRoomsOnCanvas.forEach(room => {
+                const roomDiv = document.createElement('div');
+                roomDiv.className = 'room';
+                if (room.german === 'Flur') {
+                    roomDiv.classList.add('corridor-room');
+                }
+                roomDiv.style.gridRow = `${room.gridRow} / span ${room.gridHeight}`;
+                roomDiv.style.gridColumn = `${room.gridColumn} / span ${room.gridWidth}`;
+                roomDiv.dataset.roomId = room.id; // Сохраняем ID для идентификации при перетаскивании
+                roomDiv.dataset.roomType = room.german; // Сохраняем тип комнаты для удаления
+
+                roomDiv.innerHTML = `
+                    <span class="text-xl font-bold">${room.number}</span>
+                    <span class="text-sm mt-1">${room.content}</span>
+                `;
+
+                // Добавляем обработчики событий для перетаскивания комнат на холсте
+                roomDiv.addEventListener('mousedown', startDraggingRoomOnCanvas);
+                roomDiv.addEventListener('touchstart', startDraggingRoomOnCanvas, { passive: false }); // Для тач-устройств
+
+                // Добавляем обработчик события для удаления комнаты с холста (двойной клик/тап)
+                roomDiv.addEventListener('dblclick', (e) => removeRoomFromCanvas(room.id, room.german));
+                roomDiv.addEventListener('touchend', (e) => {
+                    // Простая логика для двойного тапа
+                    const now = new Date().getTime();
+                    const lastTouch = roomDiv.dataset.lastTouch || 0;
+                    const delta = now - lastTouch;
+                    if (delta < 300 && delta > 0) { // Если второй тап в течение 300мс
+                        removeRoomFromCanvas(room.id, room.german);
+                    }
+                    roomDiv.dataset.lastTouch = now;
+                });
+
+
+                floorPlanDisplay.appendChild(roomDiv);
+            });
+
+            // Добавляем динамические двери
+            currentRoomsOnCanvas.forEach(room => {
+                const roomDiv = floorPlanDisplay.querySelector(`[data-room-id="${room.id}"]`);
+                if (!roomDiv) return;
+
+                // Проверяем соседей
+                const neighbors = [
+                    { row: room.gridRow - 1, col: room.gridColumn, side: 'top', oppositeSide: 'bottom' },
+                    { row: room.gridRow + room.gridHeight, col: room.gridColumn, side: 'bottom', oppositeSide: 'top' },
+                    { row: room.gridRow, col: room.gridColumn - 1, side: 'left', oppositeSide: 'right' },
+                    { row: room.gridRow, col: room.gridColumn + room.gridWidth, side: 'right', oppositeSide: 'left' }
+                ];
+
+                neighbors.forEach(neighbor => {
+                    // Для дверей, соединяющих комнаты, нужно проверить, существует ли соседняя комната
+                    // и находится ли она в пределах соответствующей стороны.
+                    // Для комнат 2x1, двери могут быть по центру или сбоку.
+                    // Упрощенная логика дверей: если соседняя ячейка занята любой частью другой комнаты.
+                    const adjacentRoomExists = currentRoomsOnCanvas.some(otherRoom =>
+                        otherRoom.id !== room.id &&
+                        neighbor.row >= otherRoom.gridRow && neighbor.row < (otherRoom.gridRow + otherRoom.gridHeight) &&
+                        neighbor.col >= otherRoom.gridColumn && neighbor.col < (otherRoom.gridColumn + otherRoom.gridWidth)
+                    );
+
+                    if (adjacentRoomExists) {
+                        const doorDiv = document.createElement('div');
+                        doorDiv.className = `door-indicator door-${neighbor.side}`;
+                        roomDiv.appendChild(doorDiv);
+                    }
+                });
+            });
+
+            renderLegendQuiz(); // Обновляем викторину после рендеринга комнат
+            renderPalette(); // Обновляем палитру, чтобы отобразить, какие комнаты используются
+        }
+
+
+        // Функция для удаления комнаты с холста
+        function removeRoomFromCanvas(roomId, roomType) {
+            currentRoomsOnCanvas = currentRoomsOnCanvas.filter(room => room.id !== roomId);
+            renderCanvas(); // Перерендериваем холст
+        }
+
+        // Функция для начала перетаскивания комнаты на холст (для уже существующих комнат)
+        let draggedRoomElement = null; // Хранит DOM-элемент, который перетаскивается
+        let startGridRow, startGridColumn; // Начальные координаты комнаты
+        let offsetX, offsetY; // Смещение курсора относительно верхнего левого угла элемента
+        let draggedRoomData = null; // Хранит данные о перетаскиваемой комнате
+
+        function startDraggingRoomOnCanvas(e) {
+            e.preventDefault(); // Предотвращаем стандартное поведение браузера (например, выделение текста)
+
+            const roomDiv = e.target.closest('.room');
+            if (!roomDiv) return;
+
+            draggedRoomElement = roomDiv;
+            draggedRoomElement.classList.add('dragging');
+
+            // Сохраняем начальные grid-координаты комнаты и ее данные
+            draggedRoomData = currentRoomsOnCanvas.find(r => r.id === roomDiv.dataset.roomId);
+            if (draggedRoomData) {
+                startGridRow = draggedRoomData.gridRow;
+                startGridColumn = draggedRoomData.gridColumn;
+            } else {
+                return; // Если данные комнаты не найдены, выходим
+            }
+
+            // Устанавливаем размеры перетаскиваемого элемента
+            draggedRoomElement.style.width = `${draggedRoomData.gridWidth * GRID_CELL_SIZE}px`;
+            draggedRoomElement.style.height = `${draggedRoomData.gridHeight * GRID_CELL_SIZE}px`;
+
+            // Рассчитываем смещение курсора относительно верхнего левого угла элемента
+            const rect = draggedRoomElement.getBoundingClientRect();
+            if (e.type === 'mousedown') {
+                offsetX = e.clientX - rect.left;
+                offsetY = e.clientY - rect.top;
+            } else if (e.type === 'touchstart') {
+                offsetX = e.touches[0].clientX - rect.left;
+                offsetY = e.touches[0].clientY - rect.top;
+            }
+
+            // Устанавливаем начальную абсолютную позицию относительно viewport
+            draggedRoomElement.style.left = `${rect.left}px`;
+            draggedRoomElement.style.top = `${rect.top}px`;
+            document.body.appendChild(draggedRoomElement); // Перемещаем в body для свободного перетаскивания
+
+            // Добавляем глобальные обработчики для отслеживания движения и отпускания
+            document.addEventListener('mousemove', dragRoomOnCanvas);
+            document.addEventListener('mouseup', stopDraggingRoomOnCanvas);
+            document.addEventListener('touchmove', dragRoomOnCanvas, { passive: false });
+            document.addEventListener('touchend', stopDraggingRoomOnCanvas);
+        }
+
+        // Функция для перетаскивания комнаты на холсте
+        function dragRoomOnCanvas(e) {
+            if (!draggedRoomElement || !draggedRoomData) return;
+            e.preventDefault(); // Предотвращаем прокрутку на сенсорных устройствах
+
+            let clientX, clientY;
+            if (e.type === 'mousemove') {
+                clientX = e.clientX;
+                clientY = e.clientY;
+            } else if (e.type === 'touchmove') {
+                clientX = e.touches[0].clientX;
+                clientY = e.touches[0].clientY;
+            }
+
+            // Обновляем позицию элемента относительно viewport
+            draggedRoomElement.style.left = `${clientX - offsetX}px`;
+            draggedRoomElement.style.top = `${clientY - offsetY}px`;
+
+            // Подсвечиваем целевую ячейку на плане этажа
+            const floorPlanRect = floorPlanDisplay.getBoundingClientRect();
+            const xInFloorPlan = clientX - floorPlanRect.left;
+            const yInFloorPlan = clientY - floorPlanRect.top;
+
+            // Определяем верхнюю левую ячейку, которую займет комната
+            let targetCol = Math.floor(xInFloorPlan / GRID_CELL_SIZE) + 1;
+            let targetRow = Math.floor(yInFloorPlan / GRID_CELL_SIZE) + 1;
+
+            // Проверяем, находится ли целевая область в пределах сетки
+            if (targetRow >= 1 && (targetRow + draggedRoomData.gridHeight - 1) <= GRID_ROWS &&
+                targetCol >= 1 && (targetCol + draggedRoomData.gridWidth - 1) <= GRID_COLS) {
+                highlightTargetCells(targetRow, targetCol, draggedRoomData.gridWidth, draggedRoomData.gridHeight);
+            } else {
+                removeHighlight(); // Если за пределами, убираем подсветку
+            }
+        }
+
+        // Функция для завершения перетаскивания комнаты на холсте
+        function stopDraggingRoomOnCanvas(e) {
+            if (!draggedRoomElement || !draggedRoomData) return;
+
+            draggedRoomElement.classList.remove('dragging');
+            removeHighlight(); // Убираем подсветку
+
+            // Получаем конечную позицию курсора относительно viewport
+            let finalClientX, finalClientY;
+            if (e.type === 'mouseup') {
+                finalClientX = e.clientX;
+                finalClientY = e.clientY;
+            } else if (e.type === 'touchend') {
+                finalClientX = e.changedTouches[0].clientX;
+                finalClientY = e.changedTouches[0].clientY;
+            }
+
+            // Рассчитываем позицию курсора относительно floorPlanDisplay
+            const floorPlanRect = floorPlanDisplay.getBoundingClientRect();
+            const xInFloorPlan = finalClientX - floorPlanRect.left;
+            const yInFloorPlan = finalClientY - floorPlanRect.top;
+
+            // Определяем целевую ячейку сетки на основе позиции курсора
+            let newGridColumn = Math.floor(xInFloorPlan / GRID_CELL_SIZE) + 1;
+            let newGridRow = Math.floor(yInFloorPlan / GRID_CELL_SIZE) + 1;
+
+            // Ограничиваем grid-координаты в пределах сетки, учитывая размер комнаты
+            newGridColumn = Math.max(1, Math.min(newGridColumn, GRID_COLS - draggedRoomData.gridWidth + 1));
+            newGridRow = Math.max(1, Math.min(newGridRow, GRID_ROWS - draggedRoomData.gridHeight + 1));
+
+
+            const roomId = draggedRoomData.id;
+            const roomIndex = currentRoomsOnCanvas.findIndex(r => r.id === roomId);
+
+            let shouldRevert = false;
+
+            // Проверяем, занята ли целевая область другой комнатой или выходит ли за пределы
+            if (isAreaOccupied(newGridRow, newGridColumn, draggedRoomData.gridWidth, draggedRoomData.gridHeight, roomId)) {
+                shouldRevert = true;
+                console.warn('Dieser Bereich ist bereits von einem anderen Zimmer belegt oder liegt außerhalb der Grenzen. Das Zimmer wurde an seine ursprüngliche Position zurückgesetzt.');
+            }
+
+            // Удаляем draggedRoomElement из body
+            document.body.removeChild(draggedRoomElement);
+            draggedRoomElement.style.position = ''; // Сбрасываем стили позиционирования
+            draggedRoomElement.style.left = '';
+            draggedRoomElement.style.top = '';
+            draggedRoomElement.style.width = ''; // Сбрасываем фиксированную ширину/высоту
+            draggedRoomElement.style.height = '';
+
+            if (roomIndex !== -1) {
+                if (shouldRevert) {
+                    // Возвращаем комнату на начальное место
+                    currentRoomsOnCanvas[roomIndex].gridRow = startGridRow;
+                    currentRoomsOnCanvas[roomIndex].gridColumn = startGridColumn;
+                } else {
+                    // Обновляем grid-позицию
+                    currentRoomsOnCanvas[roomIndex].gridRow = newGridRow;
+                    currentRoomsOnCanvas[roomIndex].gridColumn = newGridColumn;
+                }
+            }
+
+            draggedRoomElement = null; // Сбрасываем ссылку на перетаскиваемый элемент
+            draggedRoomData = null; // Сбрасываем данные о перетаскиваемой комнате
+
+            // Удаляем глобальные обработчики
+            document.removeEventListener('mousemove', dragRoomOnCanvas);
+            document.removeEventListener('mouseup', stopDraggingRoomOnCanvas);
+            document.removeEventListener('touchmove', dragRoomOnCanvas);
+            document.removeEventListener('touchend', stopDraggingRoomOnCanvas);
+
+            renderCanvas(); // Перерендериваем, чтобы обновить grid-расположение, номера и двери
+        }
+
+        // Обработчики событий для зоны перетаскивания (floorPlanDisplay)
+        floorPlanDisplay.addEventListener('dragover', (event) => {
+            event.preventDefault(); // Разрешаем перетаскивание
+            // Подсвечиваем целевую ячейку при перетаскивании из палитры
+            const roomType = event.dataTransfer.getData('text/plain');
+            const roomData = allRoomsMap.get(roomType);
+            if (!roomData) return;
+
+            const floorPlanRect = floorPlanDisplay.getBoundingClientRect();
+            const xInGrid = event.clientX - floorPlanRect.left;
+            const yInGrid = event.clientY - floorPlanRect.top;
+
+            const gridColumn = Math.floor(xInGrid / GRID_CELL_SIZE) + 1;
+            const gridRow = Math.floor(yInGrid / GRID_CELL_SIZE) + 1;
+
+            highlightTargetCells(gridRow, gridColumn, roomData.gridWidth, roomData.gridHeight);
+        });
+
+        floorPlanDisplay.addEventListener('dragleave', () => {
+            removeHighlight(); // Убираем подсветку при выходе
+        });
+
+        floorPlanDisplay.addEventListener('drop', (event) => {
+            event.preventDefault();
+            removeHighlight(); // Убираем подсветку после сброса
+
+            const roomType = event.dataTransfer.getData('text/plain');
+            const roomData = allRoomsMap.get(roomType);
+
+            if (!roomData) return;
+
+            // Определяем ячейку сетки, куда было сброшено
+            const floorPlanRect = floorPlanDisplay.getBoundingClientRect();
+            const xInGrid = event.clientX - floorPlanRect.left;
+            const yInGrid = event.clientY - floorPlanRect.top;
+
+            let gridColumn = Math.floor(xInGrid / GRID_CELL_SIZE) + 1;
+            let gridRow = Math.floor(yInGrid / GRID_CELL_SIZE) + 1;
+
+            // Ограничиваем grid-координаты в пределах сетки, учитывая размер комнаты
+            gridColumn = Math.max(1, Math.min(gridColumn, GRID_COLS - roomData.gridWidth + 1));
+            gridRow = Math.max(1, Math.min(gridRow, GRID_ROWS - roomData.gridHeight + 1));
+
+
+            // Проверяем, занята ли целевая область
+            if (isAreaOccupied(gridRow, gridColumn, roomData.gridWidth, roomData.gridHeight)) {
+                console.warn('Dieser Bereich ist bereits belegt!');
+                return;
+            }
+
+            // Генерируем уникальный ID для новой комнаты
+            const newRoomId = `room-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+            const newRoom = {
+                id: newRoomId,
+                german: roomType,
+                ukrainian: roomData.ukrainian,
+                content: roomData.content,
+                gridRow: gridRow,
+                gridColumn: gridColumn,
+                gridWidth: roomData.gridWidth, // Добавляем ширину
+                gridHeight: roomData.gridHeight, // Добавляем высоту
+                number: 0 // Номер будет присвоен при рендеринге
+            };
+
+            currentRoomsOnCanvas.push(newRoom);
+            renderCanvas(); // Перерендериваем холст с новой комнатой
+        });
+
+        // Обработчик для кнопки "Очистить план"
+        clearPlanBtn.addEventListener('click', () => {
+            currentRoomsOnCanvas = []; // Очищаем все комнаты
+            renderCanvas(); // Перерендериваем пустой холст
+        });
+
+        // Добавляем обработчик событий для кнопки "Проверить все"
+        checkAllBtn.addEventListener('click', () => {
+            let correctCount = 0;
+            const quizInputs = document.querySelectorAll('.legend-item .quiz-input');
+            const totalQuestions = quizInputs.length;
+
+            quizInputs.forEach(input => {
+                const item = input.closest('.legend-item');
+                const feedbackMessage = item.querySelector('.feedback-message');
+                const correctAnswerDisplay = item.querySelector('.correct-answer-display');
+
+                const correctNumbersStr = input.dataset.correctNumbers;
+                const correctNumbers = correctNumbersStr.split(',').map(Number);
+                const enteredNumber = parseInt(input.value);
+
+                item.classList.remove('correct', 'incorrect'); // Убираем предыдущие классы
+                feedbackMessage.textContent = '';
+                feedbackMessage.classList.remove('feedback-correct', 'feedback-incorrect');
+                correctAnswerDisplay.style.display = 'none';
+
+                if (isNaN(enteredNumber)) {
+                    feedbackMessage.textContent = 'Bitte geben Sie eine Zahl ein.';
+                    feedbackMessage.classList.add('feedback-incorrect');
+                    item.classList.add('incorrect');
+                } else if (correctNumbers.includes(enteredNumber)) {
+                    correctCount++;
+                    feedbackMessage.textContent = 'Richtig!';
+                    feedbackMessage.className = 'feedback-message feedback-correct';
+                    item.classList.add('correct');
+                    input.disabled = true; // Отключаем поле после правильного ответа
+                } else {
+                    feedbackMessage.textContent = `Falsch. Richtige Nummern: ${correctNumbers.join(', ')}`;
+                    feedbackMessage.className = 'feedback-message feedback-incorrect';
+                    item.classList.add('incorrect');
+                    correctAnswerDisplay.textContent = `Richtige Nummern: ${correctNumbers.join(', ')}`;
+                    correctAnswerDisplay.style.display = 'inline';
+                }
+            });
+
+            scoreDisplay.textContent = `Richtige Antworten: ${correctCount}/${totalQuestions}`;
+        });
+
+        // Начальный рендеринг при загрузке страницы
+        document.addEventListener('DOMContentLoaded', () => {
+            renderCanvas(); // Рендеринг пустого холста и палитры
+        });
+    </script>
+</body>
+</html>
